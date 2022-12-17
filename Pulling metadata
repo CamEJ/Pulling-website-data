@@ -1,0 +1,76 @@
+
+
+
+
+url<-"https://www.blacksheepsurfco.com/surfboard-fins"
+
+# making http request
+resource<-GET(url)
+
+parse<-htmlParse(resource) 
+
+links<-xpathSApply(parse,path = "//a",xmlGetAttr,"href") 
+
+head(links) 
+
+chk.b <- do.call(rbind.data.frame, links)
+chk.b= as.data.frame(trimws(chk.b[,1]))
+colnames(chk.b)[1] <- 'URLs'
+
+finA = as.data.frame(grep(".*html",chk.b$URLs, value=T))
+fin.4 = as.data.frame(grep("fin",finA[,1], value=T))
+
+# split into batches if timing out
+colnames(fin.4)[1] <- 'Pages'
+
+
+fin.4$descr <- sapply(fin.4$Pages, function(url){
+  url %>% 
+    GET(., timeout(180)) %>% 
+    as.character() %>% 
+    read_html() %>% 
+    html_nodes(xpath = '//meta[@property="og:description"]') %>% 
+    html_attr('content')
+})
+
+fin.4$Handle <- sapply(fin.4$Pages, function(url){
+  url %>% 
+    GET(., timeout(180)) %>% 
+    as.character() %>% 
+    read_html() %>% 
+    html_nodes(xpath = '//meta[@property="og:title"]') %>% 
+    html_attr('content')
+})
+
+# can also use tryCatch if curl brings an error and wont proceed to next line
+
+
+srf$descr <- sapply(srf$Pages, function(url){
+  tryCatch(url %>% 
+    GET(., timeout(180)) %>% 
+    as.character() %>% 
+    read_html() %>% 
+    html_nodes(xpath = '//meta[@property="og:description"]') %>% 
+    html_attr('content'),
+    error=function(e) NULL)
+})
+
+srf$Handle <- sapply(srf$Pages, function(url){
+  tryCatch(url %>% 
+    GET(., timeout(180)) %>% 
+    as.character() %>% 
+    read_html() %>% 
+    html_nodes(xpath = '//meta[@property="og:title"]') %>% 
+    html_attr('content'),
+    error=function(e) NULL)
+})
+
+
+str(srf)
+
+srf2 = srf
+srf$descr = as.character(srf$descr)
+srf$Handle = as.character(srf$Handle)
+
+write.csv(srf, file='Surfboards-Description.csv',row.names=F,quote=F)
+
